@@ -1,0 +1,187 @@
+<!-- front/views/partials/head.html -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- jQuery -->
+<script src="/public/js/jquery-3.7.0.min.js"></script>
+
+<!-- Bootstrap CSS -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- Chess libraries -->
+<link rel="stylesheet" href="/public/css/chessboard-1.0.0.min.css" />
+<script src="/public/js/chessboard-1.0.0.min.js"></script>
+<script src="/public/js/chess-0.10.3.min.js"></script>
+
+<!-- Socket.io -->
+<script src="/socket.io/socket.io.js"></script>
+<script>let socket = io();</script>
+
+<!-- Custom CSS -->
+<style>
+    .bg-gray {
+        background-color: #f5f5f5;
+    }
+    
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    /* Login styles */
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+    
+    .login-container .card {
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Game layout */
+    .board-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    .game-info {
+        padding: 15px;
+    }
+    
+    .status-box, .pgn-box {
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+    
+    .pgn {
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        white-space: pre-wrap;
+    }
+    
+    .player-info {
+        margin-bottom: 15px;
+    }
+    
+    .playing-as {
+        display: block;
+        font-weight: bold;
+    }
+    
+    /* Video call styles */
+    .video-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    .video-wrapper {
+        position: relative;
+        width: 48%;
+    }
+    
+    video {
+        width: 100%;
+        border-radius: 8px;
+        background-color: #333;
+        max-height: 200px;
+        object-fit: cover;
+    }
+    
+    .video-label {
+        position: absolute;
+        bottom: 5px;
+        left: 5px;
+        background-color: rgba(0,0,0,0.5);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    
+    .video-controls {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    /* Chat styles */
+    .chat-messages {
+        height: 300px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+    
+    .chat-message {
+        margin-bottom: 10px;
+        padding: 8px 12px;
+        border-radius: 18px;
+        max-width: 80%;
+        word-wrap: break-word;
+    }
+    
+    .chat-message-self {
+        background-color: #007bff;
+        color: white;
+        margin-left: auto;
+    }
+    
+    .chat-message-other {
+        background-color: #e9ecef;
+        margin-right: auto;
+    }
+    
+    .chat-input-container {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .chat-sender {
+        font-weight: bold;
+        font-size: 0.8rem;
+        margin-bottom: 2px;
+    }
+    
+    .chat-time {
+        font-size: 0.7rem;
+        color: #6c757d;
+        margin-left: 5px;
+    }
+    
+    /* Buttons and other elements */
+    .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .btn-block {
+        width: 100%;
+    }
+    
+    .user-info {
+        font-size: 1rem;
+        font-weight: bold;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 992px) {
+        .video-wrapper {
+            width: 100%;
+        }
+    }
+</style>

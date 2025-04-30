@@ -1,0 +1,30 @@
+<html>
+<head>{{> head}}</head>
+<body class="bg-gray-900 text-white p-8">
+    <h1 class="text-xl mb-4">Welcome, {{username}}</h1>
+    <a href="/logout" class="underline text-sm mb-4 inline-block">Logout</a>
+    <div>
+        <input id="codeInput" class="bg-gray-700 p-2 rounded mr-2" placeholder="Enter friend code" />
+        <button id="createGame" class="bg-green-600 px-4 py-2 rounded">Create Game</button>
+        <button id="joinGame" class="bg-blue-600 px-4 py-2 rounded">Join Game</button>
+    </div>
+    <div id="errorMessage" class="text-red-500 mt-2"></div>
+
+    <script>
+        $('#createGame').on('click', () => {
+            const code = $('#codeInput').val();
+            if (code) window.location.href = `/white?code=${code}`;
+        });
+
+        $('#joinGame').on('click', () => {
+            const code = $('#codeInput').val();
+            if (code) window.location.href = `/black?code=${code}`;
+        });
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error') === 'invalidCode') {
+            $('#errorMessage').text('Invalid invite code');
+        }
+    </script>
+</body>
+</html>

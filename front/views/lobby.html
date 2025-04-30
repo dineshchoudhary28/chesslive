@@ -1,0 +1,75 @@
+<!-- front/views/lobby.html -->
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        {{> head}}
+        <title>Chess Plus - Lobby</title>
+    </head>
+    <body class="bg-gray">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6 offset-md-3">
+                    <div class="card mt-5">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h2>Chess Game Lobby</h2>
+                            <div class="user-info">
+                                <span id="usernameDisplay"></span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="gameCode">Game Code</label>
+                                <input type="text" id="gameCode" class="form-control" placeholder="Enter game code">
+                            </div>
+                            <div class="button-group">
+                                <button id="createGame" class="btn btn-success">Create New Game</button>
+                                <button id="joinGame" class="btn btn-primary">Join Game</button>
+                            </div>
+                            
+                            <div class="alert alert-danger mt-3 d-none" id="errorMessage"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            $(document).ready(function() {
+                // Check if user is logged in
+                const username = sessionStorage.getItem('username');
+                if (!username) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                // Display username
+                $('#usernameDisplay').text('Welcome, ' + username);
+                
+                // Generate random code if not provided
+                if (!$('#gameCode').val()) {
+                    $('#gameCode').val(Math.random().toString(36).substring(2, 8));
+                }
+
+                // Create game button
+                $('#createGame').on('click', function() {
+                    const code = $('#gameCode').val();
+                    if (!code) return;
+                    window.location.href = '/game/white?code=' + code;
+                });
+                
+                // Join game button
+                $('#joinGame').on('click', function() {
+                    const code = $('#gameCode').val();
+                    if (!code) return;
+                    window.location.href = '/game/black?code=' + code;
+                });
+                
+                // Display error message if present in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('error') === 'invalidCode') {
+                    $('#errorMessage').text('Invalid game code or game not found').removeClass('d-none');
+                }
+            });
+        </script>
+    </body>
+</html>
