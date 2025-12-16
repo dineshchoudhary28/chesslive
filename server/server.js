@@ -6,6 +6,7 @@ const http = require('http'),
       socket = require('socket.io');
 
 const config = require('../config');
+const { connectDB } = require('./database/database');
 
 const myIo = require('./sockets/io'),
       routes = require('./routes/routes');
@@ -13,6 +14,12 @@ const myIo = require('./sockets/io'),
 const app = express(),
       server = http.Server(app),
       io = socket(server);
+
+// Initialize database connection
+connectDB().catch(err => {
+    console.error('Failed to connect to database:', err);
+    process.exit(1);
+});
 
 server.listen(config.port);
 

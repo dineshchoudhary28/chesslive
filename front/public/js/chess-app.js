@@ -1,5 +1,3 @@
-// front/public/js/chess-app.js
-
 // Chess game variables
 let gameHasStarted = false;
 let gameOver = false;
@@ -13,6 +11,7 @@ let remoteStream;
 let peerConnection;
 let isVideoEnabled = true;
 let isAudioEnabled = true;
+let isInitiator = false;
 
 // DOM elements
 const $status = $('#status');
@@ -65,11 +64,98 @@ function onDrop(source, target) {
     socket.emit('move', theMove);
     
     updateStatus();
+    
+    // Check if game is over after this move
+    if (game.game_over()) {
+        handleGameOver();
+    }
 }
 
 function onSnapEnd() {
     // Update the board position after piece snap
     board.position(game.fen());
+}
+
+function handleGameOver() {
+    gameOver = true;
+    let winner = null;
+    let reason = '';
+    let winnerName = '';
+    
+    if (game.in_checkmate()) {
+        // Determine winner
+        const loser = game.turn(); // Current turn is the one who got checkmated
+        winner = loser === 'w' ? 'black' : 'white';
+        reason = 'checkmate';
+        
+        if (winner === playerColor) {
+            winnerName = username;
+        } else {
+            winnerName = opponentName;
+        }
+    } else if (game.in_draw()) {
+        winner = 'draw';
+        reason = 'draw';
+    }
+    
+    // Send game over event to server
+    socket.emit('gameOver', {
+        winner: winner,
+        reason: reason,
+        winnerName: winnerName
+    });
+}
+
+function showGameOverModal(winner, reason, winnerName) {
+    let title = '';
+    let message = '';
+    let isWinner = false;
+    
+    if (winner === 'draw') {
+        title = 'Game Draw!';
+        message = 'The game ended in a draw.';
+    } else if (winner === playerColor) {
+        title = 'Congratulations!';
+        message = 'You won the game!';
+        isWinner = true;
+    } else {
+        title = 'Better Luck Next Time!';
+        message = `${winnerName} won the game.`;
+    }
+    
+    if (reason === 'checkmate') {
+        message += ' Game ended by checkmate.';
+    }
+    
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal fade show" id="gameOverModal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header ${isWinner ? 'bg-success text-white' : 'bg-warning'}">
+                        <h4 class="modal-title">${title}</h4>
+                    </div>
+                    <div class="modal-body text-center">
+                        <h5>${message}</h5>
+                        <div class="mt-3">
+                            <button id="backToLobby" class="btn btn-primary btn-lg">Back to Lobby</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    $('#gameOverModal').remove();
+    
+    // Add modal to body
+    $('body').append(modalHtml);
+    
+    // Handle back to lobby button
+    $('#backToLobby').on('click', function() {
+        window.location.href = '/lobby';
+    });
 }
 
 function updateStatus() {
@@ -131,11 +217,25 @@ function initializeBoard() {
 // Initialize WebRTC
 async function initializeWebRTC() {
     try {
-        // Get local media stream
-        localStream = await navigator.mediaDevices.getUserMedia({ 
-            video: true, 
-            audio: true 
-        });
+        console.log('Initializing WebRTC for player:', playerColor);
+        
+        // Determine if this player initiates the call
+        isInitiator = (playerColor === 'white');
+        
+        // Get local media stream with specific constraints
+        const constraints = {
+            video: {
+                width: { ideal: 320 },
+                height: { ideal: 240 },
+                frameRate: { ideal: 15 }
+            },
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true
+            }
+        };
+        
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
         
         // Display local video
         $localVideo.srcObject = localStream;
@@ -143,20 +243,25 @@ async function initializeWebRTC() {
         // Create peer connection with STUN servers
         const configuration = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' }
-            ]
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ],
+            iceCandidatePoolSize: 10
         };
         
         peerConnection = new RTCPeerConnection(configuration);
         
         // Add local tracks to peer connection
         localStream.getTracks().forEach(track => {
+            console.log('Adding track:', track.kind);
             peerConnection.addTrack(track, localStream);
         });
         
         // Handle incoming tracks (remote video)
         peerConnection.ontrack = (event) => {
+            console.log('Received remote track:', event.track.kind);
             if (event.streams && event.streams[0]) {
+                console.log('Setting remote video stream');
                 $remoteVideo.srcObject = event.streams[0];
                 remoteStream = event.streams[0];
             }
@@ -165,72 +270,117 @@ async function initializeWebRTC() {
         // Handle ICE candidates
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
+                console.log('Sending ICE candidate');
                 socket.emit('iceCandidate', {
                     candidate: event.candidate
                 });
             }
         };
         
-        // Create offer if white player (initiator)
-        if (playerColor === 'white' && gameHasStarted) {
-            createOffer();
+        // Handle connection state changes
+        peerConnection.onconnectionstatechange = () => {
+            console.log('Connection state:', peerConnection.connectionState);
+        };
+        
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE connection state:', peerConnection.iceConnectionState);
+        };
+        
+        // Small delay before creating offer to ensure both peers are ready
+        if (isInitiator) {
+            setTimeout(() => {
+                console.log('Creating offer as initiator');
+                createOffer();
+            }, 1000);
         }
         
     } catch (error) {
         console.error('Error accessing media devices:', error);
-        // Fallback message in the UI
-        $localVideo.parentElement.innerHTML = '<div class="alert alert-danger">Camera/microphone access denied or not available</div>';
+        // Show user-friendly error message
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-warning';
+        errorDiv.innerHTML = 'Camera/microphone access denied or not available. Video chat will be disabled.';
+        $localVideo.parentElement.appendChild(errorDiv);
     }
 }
 
 // Create and send WebRTC offer
 async function createOffer() {
+    if (!peerConnection) {
+        console.error('No peer connection available');
+        return;
+    }
+    
     try {
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        
-        socket.emit('offer', {
-            offer: peerConnection.localDescription
+        console.log('Creating WebRTC offer');
+        const offer = await peerConnection.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
         });
+        
+        await peerConnection.setLocalDescription(offer);
+        console.log('Sending offer to opponent');
+        
+        socket.emit('webrtc-offer', {
+            offer: peerConnection.localDescription,
+            from: playerColor
+        });
+        
     } catch (error) {
         console.error('Error creating offer:', error);
     }
 }
 
 // Handle incoming WebRTC offer
-async function handleOffer(offer) {
-    if (!peerConnection) return;
+async function handleOffer(data) {
+    if (!peerConnection) {
+        console.error('No peer connection available for handling offer');
+        return;
+    }
     
     try {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        console.log('Handling WebRTC offer from:', data.from);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         
-        socket.emit('answer', {
-            answer: peerConnection.localDescription
+        console.log('Sending answer to opponent');
+        socket.emit('webrtc-answer', {
+            answer: peerConnection.localDescription,
+            from: playerColor
         });
+        
     } catch (error) {
         console.error('Error handling offer:', error);
     }
 }
 
 // Handle incoming WebRTC answer
-async function handleAnswer(answer) {
-    if (!peerConnection) return;
+async function handleAnswer(data) {
+    if (!peerConnection) {
+        console.error('No peer connection available for handling answer');
+        return;
+    }
     
     try {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        console.log('Handling WebRTC answer from:', data.from);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
     } catch (error) {
         console.error('Error handling answer:', error);
     }
 }
 
 // Handle ICE candidate
-async function handleIceCandidate(iceCandidate) {
-    if (!peerConnection) return;
+async function handleIceCandidate(data) {
+    if (!peerConnection) {
+        console.error('No peer connection available for ICE candidate');
+        return;
+    }
     
     try {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(iceCandidate));
+        console.log('Adding ICE candidate');
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
     } catch (error) {
         console.error('Error adding ICE candidate:', error);
     }
@@ -238,6 +388,8 @@ async function handleIceCandidate(iceCandidate) {
 
 // Toggle video on/off
 function toggleVideo() {
+    if (!localStream) return;
+    
     isVideoEnabled = !isVideoEnabled;
     
     localStream.getVideoTracks().forEach(track => {
@@ -245,10 +397,14 @@ function toggleVideo() {
     });
     
     $toggleVideo.text(isVideoEnabled ? 'Turn Off Video' : 'Turn On Video');
+    $toggleVideo.removeClass(isVideoEnabled ? 'btn-success' : 'btn-secondary');
+    $toggleVideo.addClass(isVideoEnabled ? 'btn-secondary' : 'btn-success');
 }
 
 // Toggle audio on/off
 function toggleAudio() {
+    if (!localStream) return;
+    
     isAudioEnabled = !isAudioEnabled;
     
     localStream.getAudioTracks().forEach(track => {
@@ -256,6 +412,8 @@ function toggleAudio() {
     });
     
     $toggleAudio.text(isAudioEnabled ? 'Mute Audio' : 'Unmute Audio');
+    $toggleAudio.removeClass(isAudioEnabled ? 'btn-secondary' : 'btn-danger');
+    $toggleAudio.addClass(isAudioEnabled ? 'btn-danger' : 'btn-secondary');
 }
 
 // ----- CHAT FUNCTIONALITY -----
@@ -276,16 +434,45 @@ function sendChatMessage() {
 // Add message to chat display
 function addChatMessage(message) {
     const isSelf = message.sender === username;
-    const messageHtml = `
-        <div class="chat-message ${isSelf ? 'chat-message-self' : 'chat-message-other'}">
-            ${!isSelf ? `<div class="chat-sender">${message.sender}</div>` : ''}
-            ${message.text}
-            <span class="chat-time">${message.time}</span>
-        </div>
-    `;
+    const timestamp = formatMessageTime(message.time);
+    
+    let messageHtml;
+    if (message.sender === 'System') {
+        messageHtml = `
+            <div class="chat-message system-message">
+                <div class="chat-text">${sanitizeMessage(message.text)}</div>
+                <span class="chat-time">${timestamp}</span>
+            </div>
+        `;
+    } else {
+        messageHtml = `
+            <div class="chat-message ${isSelf ? 'chat-message-self' : 'chat-message-other'}">
+                ${!isSelf ? `<div class="chat-sender">${sanitizeMessage(message.sender)}</div>` : ''}
+                <div class="chat-text">${sanitizeMessage(message.text)}</div>
+                <span class="chat-time">${timestamp}</span>
+            </div>
+        `;
+    }
     
     $chatMessages.append(messageHtml);
     $chatMessages.scrollTop($chatMessages[0].scrollHeight);
+}
+
+// Format message time
+function formatMessageTime(timestamp) {
+    if (!timestamp) return '';
+    try {
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+        return '';
+    }
+}
+
+// Sanitize message content
+function sanitizeMessage(text) {
+    if (!text) return '';
+    return $('<div>').text(text).html();
 }
 
 // ----- EVENT HANDLERS -----
@@ -312,17 +499,21 @@ $(document).ready(function() {
     $chatInput.on('keypress', function(e) {
         if (e.which === 13) { // Enter key
             sendChatMessage();
+            e.preventDefault();
         }
     });
     
     // Socket event handlers
     socket.on('startGame', function(data) {
+        console.log('Game started with opponent:', data.opponent);
         gameHasStarted = true;
         opponentName = data.opponent;
         $opponentName.text('Opponent: ' + opponentName);
         
         // Initialize WebRTC after both players joined
-        initializeWebRTC();
+        setTimeout(() => {
+            initializeWebRTC();
+        }, 500);
         
         updateStatus();
     });
@@ -335,6 +526,11 @@ $(document).ready(function() {
         game.move(move);
         board.position(game.fen());
         updateStatus();
+        
+        // Check if game is over after opponent's move
+        if (game.game_over()) {
+            handleGameOver();
+        }
     });
     
     socket.on('gameOverDisconnect', function(data) {
@@ -343,25 +539,45 @@ $(document).ready(function() {
         addChatMessage({
             sender: 'System',
             text: `${data.username || 'Opponent'} disconnected from the game.`,
-            time: new Date().toLocaleTimeString()
+            time: new Date().toISOString()
         });
+        
+        // Show win modal for disconnection
+        showGameOverModal(playerColor, 'disconnect', username);
     });
     
-    // WebRTC signaling
-    socket.on('offer', function(data) {
-        handleOffer(data.offer);
+    // Handle game ended event
+    socket.on('gameEnded', function(data) {
+        console.log('Game ended:', data);
+        showGameOverModal(data.winner, data.reason, data.winnerName);
     });
     
-    socket.on('answer', function(data) {
-        handleAnswer(data.answer);
+    // WebRTC signaling with updated event names
+    socket.on('webrtc-offer', function(data) {
+        console.log('Received WebRTC offer');
+        handleOffer(data);
+    });
+    
+    socket.on('webrtc-answer', function(data) {
+        console.log('Received WebRTC answer');
+        handleAnswer(data);
     });
     
     socket.on('iceCandidate', function(data) {
-        handleIceCandidate(data.candidate);
+        console.log('Received ICE candidate');
+        handleIceCandidate(data);
     });
     
     // Chat messages
     socket.on('newMessage', function(message) {
         addChatMessage(message);
+    });
+    
+    socket.on('chatHistory', function(messages) {
+        if (Array.isArray(messages)) {
+            messages.forEach(message => {
+                addChatMessage(message);
+            });
+        }
     });
 });

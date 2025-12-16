@@ -15,7 +15,15 @@
 
 <!-- Socket.io -->
 <script src="/socket.io/socket.io.js"></script>
-<script>let socket = io();</script>
+<script>
+    // Initialize socket connection
+    let socket = io();
+    
+    // Debug socket events
+    socket.on('connect', () => console.log('Socket connected'));
+    socket.on('disconnect', () => console.log('Socket disconnected'));
+    socket.on('connect_error', (err) => console.error('Connection error:', err));
+</script>
 
 <!-- Custom CSS -->
 <style>
@@ -138,11 +146,26 @@
         background-color: #007bff;
         color: white;
         margin-left: auto;
+        border-bottom-right-radius: 4px;
     }
     
     .chat-message-other {
         background-color: #e9ecef;
+        color: #212529;
         margin-right: auto;
+        border-bottom-left-radius: 4px;
+    }
+    
+    .system-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 5px 10px;
+        margin: 5px auto;
+        max-width: 90%;
+        text-align: center;
+        font-style: italic;
     }
     
     .chat-input-container {
@@ -156,10 +179,16 @@
         margin-bottom: 2px;
     }
     
+    .chat-text {
+        margin-bottom: 4px;
+    }
+    
     .chat-time {
         font-size: 0.7rem;
-        color: #6c757d;
-        margin-left: 5px;
+        opacity: 0.7;
+        display: block;
+        text-align: right;
+        margin-top: 2px;
     }
     
     /* Buttons and other elements */

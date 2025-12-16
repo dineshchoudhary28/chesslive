@@ -23,6 +23,10 @@
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">Login</button>
                         </form>
+                        <div class="text-center mt-3">
+                            <p>Don't have an account? <a href="/register">Register here</a></p>
+                        </div>
+                        <div class="alert alert-danger mt-3 d-none" id="errorMessage"></div>
                     </div>
                 </div>
             </div>
@@ -51,7 +55,7 @@
 
                 // Handle login failure
                 socket.on('loginFailed', function(data) {
-                    alert(data.message || 'Login failed. Please check your credentials.');
+                    $('#errorMessage').text(data.message || 'Login failed. Please check your credentials.').removeClass('d-none');
                 });
             });
         </script>

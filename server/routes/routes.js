@@ -5,9 +5,19 @@ module.exports = app => {
         res.render('login');
     });
 
+    // Register page
+    app.get('/register', (req, res) => {
+        res.render('register');
+    });
+
     // Lobby page (after login)
     app.get('/lobby', (req, res) => {
         res.render('lobby');
+    });
+
+    // Profile page
+    app.get('/profile', (req, res) => {
+        res.render('profile');
     });
 
     // Game routes

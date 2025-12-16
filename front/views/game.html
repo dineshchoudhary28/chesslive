@@ -113,7 +113,18 @@
             if (!username) {
                 window.location.href = '/';
             }
+            
+            // Connect to socket server if not already connected
+            socket.on('connect', function() {
+                console.log('Connected to socket server');
+                // Join the game room after connection
+                socket.emit('joinGame', {
+                    code: gameCode,
+                    username: username
+                });
+            });
         </script>
         <script src="/public/js/chess-app.js"></script>
+        <script src="/public/js/chat.js"></script>
     </body>
 </html>
